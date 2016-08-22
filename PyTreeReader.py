@@ -28,7 +28,6 @@ class PyTreeReader:
     def __init__(self, tree, pattern="", regex="", branchList=[]):
         _pyReaderCounter = 0
         theclassname = "class_%s" %_pyReaderCounter
-
         thegetters = ""
         thettreeReaderValues = ""
         theInit = ""
@@ -36,11 +35,18 @@ class PyTreeReader:
         branchesNameTypes = [(b.GetName(),_get_branch_type_name(b)) for b in tree.GetListOfBranches()]
         for name, typeName in branchesNameTypes:
             memberName = 'f%s' %name
-            thettreeReaderValues += '   TTreeReaderValue<%s> %s;\n' %(typeName,memberName)
-            theInit += ',\n                          %s(fTreeReader, "%s")' %(memberName,name)
-            thegetters += '   const %s& %s(){return *f%s;}\n' %(typeName,name,name) 
+            strippedMemberName = memberName
+            strippedName = name
+            # Removes the "." from names if it's needed.
+            if strippedMemberName[-1] == '.': strippedMemberName = strippedMemberName[:-1]
+            if strippedName[-1] == '.': strippedName = strippedName[:-1]
+            # Replaces the " " with "_" if its the last character of the name
+            if strippedMemberName[-1] == " ": strippedMemberName = strippedMemberName[:-1] + "_"
+            if strippedName[-1] == ' ': strippedName = strippedName[:-1] + "_"
+            thettreeReaderValues += '   TTreeReaderValue<%s> %s;\n' %(typeName,strippedMemberName)
+            theInit += ',\n                          %s(fTreeReader, "%s")' %(strippedMemberName,name)
+            thegetters += '   const %s& %s(){return *f%s;}\n' %(typeName,strippedName,strippedName)
         classCode = _class_code_template %(theclassname, thettreeReaderValues,theclassname, theInit, thegetters)
-        #print classCode
         ROOT.gInterpreter.Declare(classCode)
         self._ttreeReaderWrapper = getattr(ROOT, theclassname)(tree)
     def __iter__(self):
