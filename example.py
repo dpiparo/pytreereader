@@ -16,7 +16,7 @@ duration = timer() - start
 print "PyROOT: %s" %duration
 
 start = timer()
-for i, event in enumerate(PyTreeReader(f.ntuple,"*")):
+for event in PyTreeReader(f.ntuple,"*"):
 	fill(event.px()*event.py()*event.pz()*event.random())
 duration = timer() - start
 print "PyTreeReader no cache: %s" %duration
@@ -27,7 +27,7 @@ duration = timer() - start
 print "PyTreeReader build cache: %s" %duration
 
 start = timer()
-for i, event in enumerate(ptr):
+for event in ptr:
     fill(event.px()*event.py()*event.pz()*event.random())
 duration = timer() - start
 print "PyTreeReader with cache: %s" %duration
