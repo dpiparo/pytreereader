@@ -36,3 +36,11 @@ h.Draw()
 
 for i in ptr.py_array(): print i
 
+# Now ROOTPy
+from rootpy.plotting import Hist
+h1 = Hist(1024, -200, 200, title='Background', markersize=0)
+h1.fill_array(ptr.py_array())
+
+
+
+
