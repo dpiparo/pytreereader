@@ -140,6 +140,12 @@ class PyTreeReader:
         self._ttreeReaderWrapper = getattr(ROOT, theclassname)(tree)
         self._next = self._ttreeReaderWrapper.Next
 
+        # Expose arrays
+        if cache:
+            for name,_ in branchesNameTypes:
+                methodName = name+'_array'
+                setattr(self, methodName, getattr(self._ttreeReaderWrapper,methodName)) 
+
     def __iter__(self):
         while self._next():
             yield self._ttreeReaderWrapper

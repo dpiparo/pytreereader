@@ -34,3 +34,5 @@ print "PyTreeReader with cache: %s" %duration
 
 h.Draw()
 
+for i in ptr.py_array(): print i
+
