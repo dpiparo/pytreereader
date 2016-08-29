@@ -35,23 +35,23 @@ _class_code_cache_template = '''
 class {className} {{
 private:
 {dataVectors}
-   unsigned long int fIndex(-1);
+   unsigned long int fIndex;
    unsigned long int fNEntries;
 public:
-   {className}(TTree* tree):{dataVectorsInit}{{
-      TTreeReader fTreeReader(tree)
+   {className}(TTree* tree):fIndex(-1){{
+        TTreeReader fTreeReader(tree);
+        fNEntries = fTreeReader.GetEntries(true);
+
+{dataVectorsInit}
 
 {readerValues}
-
-      fNEntries(fTreeReader.GetEntries(force));
 
       while(fTreeReader.Next()) {{
 {dataVectorsFill}
       }}
-
    }}
 {getterMethods}
-   Bool_t Next(){{auto finished = fIndex++ < fNEntries; fIndex = finished? -1 : fIndex; }}
+   Bool_t Next(){{auto cont = fNEntries > ++fIndex; fIndex = cont? fIndex : -1; return cont; }}
 
 }};
 #endif
@@ -85,10 +85,10 @@ def _get_class_code_cached(branchesNameTypes, theclassname):
         readerName = '%s_reader' %cppname
         vectorName = 'f%s' %cppname
         vectorType = 'std::vector<%s>' %typeName
-        the_TTreeReaderValues += '   TTreeReaderValue<%s> %s;\n' %(typeName, readerName)
+        the_TTreeReaderValues += '   TTreeReaderValue<%s> %s(fTreeReader, "%s");\n' %(typeName, readerName, name)
         the_data_vectors +=  '   %s %s;\n' %(vectorType, vectorName)
         data_vectors_init += '      %s.reserve(fNEntries);\n' %vectorName;
-        data_vectors_fill += '          %s.emaplace_back(*%s);\n' %(vectorName,readerName)
+        data_vectors_fill += '          %s.emplace_back(*%s);\n' %(vectorName,readerName)
         the_getters += '   const %s& %s_array(){return %s;}\n' %(vectorType,cppname, vectorName)
         the_getters += '   const %s& %s(){return %s[fIndex];}\n' %(typeName,cppname, vectorName)
     return _class_code_cache_template.format(className = theclassname,
@@ -133,7 +133,7 @@ class PyTreeReader:
             classCode = _get_class_code_cached(branchesNameTypes, theclassname)
         else:
             classCode = _get_class_code(branchesNameTypes, theclassname)
-        print classCode
+        #print classCode
         # Here some caching? Is it worth?
         if not hasattr(ROOT, theclassname):
             ROOT.gInterpreter.Declare(classCode)
