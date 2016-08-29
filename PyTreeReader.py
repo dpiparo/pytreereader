@@ -19,11 +19,40 @@ _class_code_template = '''
 class {className} {{
 private:
    TTreeReader fTreeReader;
-{dataMembers}
+{readerValues}
 public:
    {className}(TTree* tree): fTreeReader(tree){initCode} {{}};
    Bool_t Next(){{return fTreeReader.Next();}}
 {getterMethods}
+}};
+#endif
+'''
+
+_class_code_cache_template = '''
+#ifndef __{className}__
+#define __{className}__
+
+class {className} {{
+private:
+{dataVectors}
+   unsigned long int fIndex(-1);
+   unsigned long int fNEntries;
+public:
+   {className}(TTree* tree):{dataVectorsInit}{{
+      TTreeReader fTreeReader(tree)
+
+{readerValues}
+
+      fNEntries(fTreeReader.GetEntries(force));
+
+      while(fTreeReader.Next()) {{
+{dataVectorsFill}
+      }}
+
+   }}
+{getterMethods}
+   Bool_t Next(){{auto finished = fIndex++ < fNEntries; fIndex = finished? -1 : fIndex; }}
+
 }};
 #endif
 '''
@@ -44,12 +73,36 @@ def _get_branch_names_types(branches):
     branchesNameTypes = [(b.GetName(),_get_branch_type_name(b)) for b in branches]
     return branchesNameTypes
 
-def _get_class_code(branches, theclassname):
+def _get_class_code_cached(branchesNameTypes, theclassname):
+    '''Create the class code, cache the data'''
+    the_data_vectors = ''
+    the_TTreeReaderValues = ''
+    data_vectors_fill = ''
+    data_vectors_init = ''
+    the_getters = ''
+    for name, typeName in branchesNameTypes:
+        cppname = _get_cpp_branch_name(name)
+        readerName = '%s_reader' %cppname
+        vectorName = 'f%s' %cppname
+        vectorType = 'std::vector<%s>' %typeName
+        the_TTreeReaderValues += '   TTreeReaderValue<%s> %s;\n' %(typeName, readerName)
+        the_data_vectors +=  '   %s %s;\n' %(vectorType, vectorName)
+        data_vectors_init += '      %s.reserve(fNEntries);\n' %vectorName;
+        data_vectors_fill += '          %s.emaplace_back(*%s);\n' %(vectorName,readerName)
+        the_getters += '   const %s& %s_array(){return %s;}\n' %(vectorType,cppname, vectorName)
+        the_getters += '   const %s& %s(){return %s[fIndex];}\n' %(typeName,cppname, vectorName)
+    return _class_code_cache_template.format(className = theclassname,
+                                       readerValues = the_TTreeReaderValues,
+                                       dataVectors = the_data_vectors,
+                                       dataVectorsInit = data_vectors_init,
+                                       dataVectorsFill = data_vectors_fill,
+                                       getterMethods = the_getters)
+
+def _get_class_code(branchesNameTypes, theclassname):
     '''Create the class code'''
-    thegetters = ""
-    thettreeReaderValues = ""
-    theInit = ""
-    branchesNameTypes = _get_branch_names_types(branches)
+    thegetters = ''
+    thettreeReaderValues = ''
+    theInit = ''
     # Here the loop on branches and creation of data members and getters
     for name, typeName in branchesNameTypes:
         cppname = _get_cpp_branch_name(name)
@@ -58,21 +111,29 @@ def _get_class_code(branches, theclassname):
         theInit += ',\n                          %s(fTreeReader, "%s")' %(memberName,name)
         thegetters += '   const %s& %s(){return *%s;}\n' %(typeName,cppname,memberName) 
     return _class_code_template.format(className = theclassname, 
-                                       dataMembers = thettreeReaderValues,
+                                       readerValues = thettreeReaderValues,
                                        initCode = theInit,
                                        getterMethods = thegetters)
 
 class PyTreeReader:
-    def __init__(self, tree, pattern='*', branchList=None):
+    def __init__(self, tree, pattern='*', branchList=None, cache=False):
         curFile = tree.GetCurrentFile()
-        filename = curFile.GetName() if curFile else ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in xrange(6))
-        theclassname = "cl_%s" %abs(hash(filename+tree.GetName()))
+        if curFile:
+            filename = curFile.GetName()
+        else:
+           ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in xrange(6))
+        theclassname = "cl_%s" %abs(hash(filename+tree.GetName()+pattern+str(branchList)+str(cache)))
         if branchList:
             filter_func = lambda branch: branch.GetName() in branchList
         else:
             filter_func = lambda branch: fnmatch(branch.GetName(), pattern)
         branches = [branch for branch in tree.GetListOfBranches() if filter_func(branch)]
-        classCode = _get_class_code(branches, theclassname)
+        branchesNameTypes = _get_branch_names_types(branches)
+        if cache:
+            classCode = _get_class_code_cached(branchesNameTypes, theclassname)
+        else:
+            classCode = _get_class_code(branchesNameTypes, theclassname)
+        print classCode
         # Here some caching? Is it worth?
         if not hasattr(ROOT, theclassname):
             ROOT.gInterpreter.Declare(classCode)

@@ -13,3 +13,8 @@ for i, event in enumerate(PyTreeReader(f.ntuple,"*")):
         if i == 10: break
         print event.px()
         print event.random()
+
+for i, event in enumerate(PyTreeReader(f.ntuple,"*",cache=True)):
+        if i == 10: break
+        print event.px()
+        print event.random()
