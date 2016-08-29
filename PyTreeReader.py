@@ -77,8 +77,8 @@ class PyTreeReader:
         if not hasattr(ROOT, theclassname):
             ROOT.gInterpreter.Declare(classCode)
         self._ttreeReaderWrapper = getattr(ROOT, theclassname)(tree)
-        self._next = _ttreeReaderWrapper.Next()
+        self._next = self._ttreeReaderWrapper.Next
 
     def __iter__(self):
-        while self.next():
+        while self._next():
             yield self._ttreeReaderWrapper
