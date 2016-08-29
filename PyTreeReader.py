@@ -22,7 +22,7 @@ private:
 {readerValues}
 public:
    {className}(TTree* tree): fTreeReader(tree){initCode} {{}};
-   Bool_t Next(){{return fTreeReader.Next();}}
+   Bool_t Next(){{bool status = fTreeReader.Next(); if (!status) fTreeReader.SetEntry(0); return status;}}
 {getterMethods}
 }};
 #endif
